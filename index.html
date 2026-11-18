@@ -2,191 +2,397 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bataclanas - Control de Acceso</title>
 
-  <title>Bataclanas - Lector QR</title>
+<style>
+body {
+  background: #21112f;
+  color: white;
+  font-family: Arial, sans-serif;
+  text-align: center;
+  margin: 0;
+  padding: 15px;
+}
 
-  <style>
-    body {
-      background: #21112f;
-      color: white;
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin: 0;
-      padding: 20px;
-    }
+.contenedor {
+  max-width: 420px;
+  margin: 15px auto;
+  padding: 25px 18px;
+  background: #351b49;
+  border-radius: 20px;
+}
 
-    .contenedor {
-      max-width: 420px;
-      margin: 20px auto;
-      padding: 25px 18px;
-      background: #351b49;
-      border-radius: 20px;
-    }
+h1 {
+  color: #ff73b8;
+  margin-bottom: 5px;
+}
 
-    h1 {
-      color: #ff73b8;
-      margin-bottom: 5px;
-    }
+video {
+  width: 100%;
+  border-radius: 12px;
+  margin-top: 15px;
+  background: #160b20;
+}
 
-    video {
-      width: 100%;
-      border-radius: 12px;
-      margin-top: 15px;
-      background: #160b20;
-    }
+input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 15px;
+  margin-top: 12px;
+  border-radius: 10px;
+  border: none;
+  font-size: 17px;
+}
 
-    button {
-      width: 100%;
-      padding: 16px;
-      margin-top: 15px;
-      border: none;
-      border-radius: 12px;
-      background: #df398c;
-      color: white;
-      font-size: 17px;
-      font-weight: bold;
-    }
+button {
+  width: 100%;
+  padding: 16px;
+  margin-top: 12px;
+  border: none;
+  border-radius: 12px;
+  background: #df398c;
+  color: white;
+  font-size: 17px;
+  font-weight: bold;
+}
 
-    #estado {
-      padding: 16px;
-      margin-top: 20px;
-      border-radius: 12px;
-      background: #614079;
-    }
-  </style>
+#estado {
+  padding: 20px 12px;
+  margin-top: 20px;
+  border-radius: 12px;
+  background: #614079;
+  font-size: 18px;
+  font-weight: bold;
+  min-height: 50px;
+}
+
+.valida {
+  background: #167744 !important;
+}
+
+.rechazada {
+  background: #a62640 !important;
+}
+
+.espera {
+  background: #614079 !important;
+}
+</style>
 </head>
 
 <body>
-  <div class="contenedor">
-    <h1>BATACLANAS</h1>
-    <h3>MADE IN CHILE</h3>
 
-    <p>🎟️ CONTROL DE ACCESO</p>
-    <p>Teatro Novedades</p>
+<div class="contenedor">
 
-    <video id="video" autoplay muted playsinline></video>
+  <h1>BATACLANAS</h1>
+  <h3>MADE IN CHILE</h3>
 
-    <button onclick="iniciar()">
-      📷 INICIAR ESCÁNER
-    </button>
+  <p>🎟️ CONTROL DE ACCESO</p>
+  <p>Teatro Novedades</p>
 
-    <button onclick="detener()"
-            style="background:#614079">
-      DETENER CÁMARA
-    </button>
+  <input
+    id="pin"
+    type="password"
+    placeholder="Contraseña del personal"
+    autocomplete="off"
+  >
 
-    <div id="estado">
-      Cámara apagada
-    </div>
+  <video id="video" autoplay muted playsinline></video>
 
-    <p style="font-size:12px; color:#dcc9e7">
-      Versión de prueba: detecta códigos QR,
-      pero todavía no valida entradas.
-    </p>
+  <button onclick="iniciar()">
+    📷 INICIAR ESCÁNER
+  </button>
+
+  <button onclick="detener()" style="background:#614079">
+    DETENER CÁMARA
+  </button>
+
+  <div id="estado" class="espera" aria-live="polite">
+    Ingresa la contraseña y enciende la cámara.
   </div>
 
-  <script>
-    const video = document.getElementById("video");
-    const estado = document.getElementById("estado");
+  <p style="font-size:12px;color:#dcc9e7">
+    SISTEMA DE PRUEBAS - BATACLANAS 2027
+  </p>
 
-    let camara = null;
-    let detector = null;
-    let intervalo = null;
-    let leyendo = false;
-    let ultimoCodigo = "";
-    let ultimaLectura = 0;
+</div>
 
-    async function iniciar() {
-      if (camara) return;
+<!-- Comunicación con Google Apps Script -->
+<iframe
+  name="respuestaPuente"
+  style="display:none"
+  title="Respuesta del sistema">
+</iframe>
 
-      try {
-        if (!("BarcodeDetector" in window)) {
-          throw new Error(
-            "Este navegador no admite lectura QR en vivo."
-          );
-        }
+<form
+  id="formPuente"
+  method="POST"
+  target="respuestaPuente"
+  style="display:none">
 
-        detector = new BarcodeDetector({
-          formats: ["qr_code"]
-        });
+  <input type="hidden" name="token" id="tokenEnviar">
+  <input type="hidden" name="pin" id="pinEnviar">
+  <input type="hidden" name="solicitudId" id="solicitudEnviar">
 
-        camara = await navigator.mediaDevices
-          .getUserMedia({
-            audio: false,
-            video: {
-              facingMode: { ideal: "environment" }
-            }
-          });
+</form>
 
-        video.srcObject = camara;
-        await video.play();
+<script>
 
-        estado.textContent =
-          "📷 Cámara activa. Acerca un código QR.";
+const URL_PUENTE =
+  "https://script.google.com/macros/s/AKfycbyp01JYCXhHTMWvj1gGmBJrQhQ6zfuByNFKLtChpDnCB2RSRnjzDuaXoIuSIpe1i5IhRw/exec";
 
-        intervalo = setInterval(leerQR, 400);
+const video = document.getElementById("video");
+const estado = document.getElementById("estado");
+const pinInput = document.getElementById("pin");
+const formulario = document.getElementById("formPuente");
 
-      } catch (error) {
-        detener();
-        estado.textContent =
-          "No se pudo iniciar: " + error.message;
-      }
+formulario.action = URL_PUENTE;
+
+let camara = null;
+let detector = null;
+let intervalo = null;
+
+let leyendo = false;
+let procesando = false;
+
+let ultimoCodigo = "";
+let sinCodigoDesde = 0;
+
+let solicitudActual = "";
+let tiempoEspera = null;
+
+function mostrar(mensaje, tipo = "espera") {
+  estado.textContent = mensaje;
+  estado.className = tipo;
+}
+
+async function iniciar() {
+
+  if (camara) return;
+
+  if (pinInput.value.trim().length < 12) {
+    mostrar(
+      "🔒 Ingresa la contraseña del personal.",
+      "rechazada"
+    );
+    return;
+  }
+
+  try {
+
+    if (!("BarcodeDetector" in window)) {
+      throw new Error(
+        "Este navegador no admite lectura QR en vivo."
+      );
     }
 
-    async function leerQR() {
-      if (leyendo || video.readyState < 2) return;
+    detector = new BarcodeDetector({
+      formats: ["qr_code"]
+    });
 
-      leyendo = true;
-
-      try {
-        const codigos = await detector.detect(video);
-
-        if (codigos.length > 0) {
-          const codigo = codigos[0].rawValue;
-          const ahora = Date.now();
-
-          if (codigo !== ultimoCodigo ||
-              ahora - ultimaLectura > 3000) {
-
-            ultimoCodigo = codigo;
-            ultimaLectura = ahora;
-
-            estado.textContent =
-              "✅ QR DETECTADO (sin validar)";
-
-            if (navigator.vibrate) {
-              navigator.vibrate(100);
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error de lectura QR");
-      } finally {
-        leyendo = false;
+    camara = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        facingMode: { ideal: "environment" }
       }
+    });
+
+    video.srcObject = camara;
+    await video.play();
+
+    mostrar(
+      "📷 Cámara activa. Acerca una entrada QR.",
+      "espera"
+    );
+
+    intervalo = setInterval(leerQR, 400);
+
+  } catch (error) {
+
+    detener();
+
+    mostrar(
+      "No se pudo iniciar: " + error.message,
+      "rechazada"
+    );
+  }
+}
+
+async function leerQR() {
+
+  if (leyendo || procesando || video.readyState < 2) {
+    return;
+  }
+
+  leyendo = true;
+
+  try {
+
+    const codigos = await detector.detect(video);
+
+    if (codigos.length === 0) {
+
+      if (!sinCodigoDesde) {
+        sinCodigoDesde = Date.now();
+      }
+
+      if (Date.now() - sinCodigoDesde > 1200) {
+        ultimoCodigo = "";
+      }
+
+      return;
     }
 
-    function detener() {
-      if (intervalo) {
-        clearInterval(intervalo);
-        intervalo = null;
-      }
+    sinCodigoDesde = 0;
 
-      if (camara) {
-        camara.getTracks().forEach(
-          pista => pista.stop()
-        );
-        camara = null;
-      }
+    const codigo = String(codigos[0].rawValue).trim();
 
-      video.srcObject = null;
-      estado.textContent = "Cámara apagada";
+    if (!codigo || codigo === ultimoCodigo) {
+      return;
     }
 
-    window.addEventListener("pagehide", detener);
-  </script>
+    ultimoCodigo = codigo;
+
+    validarQR(codigo);
+
+  } catch (error) {
+    console.error("Error al leer QR");
+  } finally {
+    leyendo = false;
+  }
+}
+
+function validarQR(codigo) {
+
+  if (procesando) return;
+
+  procesando = true;
+
+  solicitudActual = crypto.randomUUID();
+
+  mostrar(
+    "⏳ Verificando entrada... NO permitir ingreso todavía.",
+    "espera"
+  );
+
+  document.getElementById("tokenEnviar").value = codigo;
+  document.getElementById("pinEnviar").value = pinInput.value;
+  document.getElementById("solicitudEnviar").value =
+    solicitudActual;
+
+  formulario.submit();
+
+  tiempoEspera = setTimeout(function() {
+
+    if (!procesando) return;
+
+    procesando = false;
+    solicitudActual = "";
+
+    limpiarDatosEnvio();
+
+    mostrar(
+      "⚠️ No se recibió respuesta. NO permitir ingreso. Revisar la planilla antes de reintentar.",
+      "rechazada"
+    );
+
+  }, 25000);
+}
+
+function limpiarDatosEnvio() {
+  document.getElementById("tokenEnviar").value = "";
+  document.getElementById("pinEnviar").value = "";
+  document.getElementById("solicitudEnviar").value = "";
+}
+
+window.addEventListener("message", function(evento) {
+
+  let dominio;
+
+  try {
+    dominio = new URL(evento.origin).hostname;
+  } catch (error) {
+    return;
+  }
+
+  const origenPermitido =
+    dominio === "script.google.com" ||
+    dominio === "script.googleusercontent.com" ||
+    dominio.endsWith(".googleusercontent.com");
+
+  if (!origenPermitido) return;
+
+  const datos = evento.data;
+
+  if (!datos || datos.tipo !== "BATACLANAS_VALIDACION") {
+    return;
+  }
+
+  if (
+    !procesando ||
+    datos.solicitudId !== solicitudActual
+  ) {
+    return;
+  }
+
+  clearTimeout(tiempoEspera);
+
+  procesando = false;
+  solicitudActual = "";
+
+  limpiarDatosEnvio();
+
+  if (datos.ok === true) {
+
+    mostrar(
+      "✅ ENTRADA VÁLIDA. PERMITIR INGRESO.",
+      "valida"
+    );
+
+    if (navigator.vibrate) {
+      navigator.vibrate(200);
+    }
+
+  } else {
+
+    mostrar(
+      datos.mensaje || "❌ ENTRADA RECHAZADA.",
+      "rechazada"
+    );
+
+    if (navigator.vibrate) {
+      navigator.vibrate([100, 100, 100]);
+    }
+  }
+
+});
+
+function detener() {
+
+  if (intervalo) {
+    clearInterval(intervalo);
+    intervalo = null;
+  }
+
+  if (camara) {
+    camara.getTracks().forEach(function(pista) {
+      pista.stop();
+    });
+    camara = null;
+  }
+
+  video.srcObject = null;
+
+  if (!procesando) {
+    mostrar("Cámara apagada.", "espera");
+  }
+}
+
+window.addEventListener("pagehide", detener);
+
+</script>
+
 </body>
 </html>

@@ -1,0 +1,192 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+
+  <title>Bataclanas - Lector QR</title>
+
+  <style>
+    body {
+      background: #21112f;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .contenedor {
+      max-width: 420px;
+      margin: 20px auto;
+      padding: 25px 18px;
+      background: #351b49;
+      border-radius: 20px;
+    }
+
+    h1 {
+      color: #ff73b8;
+      margin-bottom: 5px;
+    }
+
+    video {
+      width: 100%;
+      border-radius: 12px;
+      margin-top: 15px;
+      background: #160b20;
+    }
+
+    button {
+      width: 100%;
+      padding: 16px;
+      margin-top: 15px;
+      border: none;
+      border-radius: 12px;
+      background: #df398c;
+      color: white;
+      font-size: 17px;
+      font-weight: bold;
+    }
+
+    #estado {
+      padding: 16px;
+      margin-top: 20px;
+      border-radius: 12px;
+      background: #614079;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="contenedor">
+    <h1>BATACLANAS</h1>
+    <h3>MADE IN CHILE</h3>
+
+    <p>🎟️ CONTROL DE ACCESO</p>
+    <p>Teatro Novedades</p>
+
+    <video id="video" autoplay muted playsinline></video>
+
+    <button onclick="iniciar()">
+      📷 INICIAR ESCÁNER
+    </button>
+
+    <button onclick="detener()"
+            style="background:#614079">
+      DETENER CÁMARA
+    </button>
+
+    <div id="estado">
+      Cámara apagada
+    </div>
+
+    <p style="font-size:12px; color:#dcc9e7">
+      Versión de prueba: detecta códigos QR,
+      pero todavía no valida entradas.
+    </p>
+  </div>
+
+  <script>
+    const video = document.getElementById("video");
+    const estado = document.getElementById("estado");
+
+    let camara = null;
+    let detector = null;
+    let intervalo = null;
+    let leyendo = false;
+    let ultimoCodigo = "";
+    let ultimaLectura = 0;
+
+    async function iniciar() {
+      if (camara) return;
+
+      try {
+        if (!("BarcodeDetector" in window)) {
+          throw new Error(
+            "Este navegador no admite lectura QR en vivo."
+          );
+        }
+
+        detector = new BarcodeDetector({
+          formats: ["qr_code"]
+        });
+
+        camara = await navigator.mediaDevices
+          .getUserMedia({
+            audio: false,
+            video: {
+              facingMode: { ideal: "environment" }
+            }
+          });
+
+        video.srcObject = camara;
+        await video.play();
+
+        estado.textContent =
+          "📷 Cámara activa. Acerca un código QR.";
+
+        intervalo = setInterval(leerQR, 400);
+
+      } catch (error) {
+        detener();
+        estado.textContent =
+          "No se pudo iniciar: " + error.message;
+      }
+    }
+
+    async function leerQR() {
+      if (leyendo || video.readyState < 2) return;
+
+      leyendo = true;
+
+      try {
+        const codigos = await detector.detect(video);
+
+        if (codigos.length > 0) {
+          const codigo = codigos[0].rawValue;
+          const ahora = Date.now();
+
+          if (codigo !== ultimoCodigo ||
+              ahora - ultimaLectura > 3000) {
+
+            ultimoCodigo = codigo;
+            ultimaLectura = ahora;
+
+            estado.textContent =
+              "✅ QR DETECTADO (sin validar)";
+
+            if (navigator.vibrate) {
+              navigator.vibrate(100);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error de lectura QR");
+      } finally {
+        leyendo = false;
+      }
+    }
+
+    function detener() {
+      if (intervalo) {
+        clearInterval(intervalo);
+        intervalo = null;
+      }
+
+      if (camara) {
+        camara.getTracks().forEach(
+          pista => pista.stop()
+        );
+        camara = null;
+      }
+
+      video.srcObject = null;
+      estado.textContent = "Cámara apagada";
+    }
+
+    window.addEventListener("pagehide", detener);
+  </script>
+</body>
+</html>

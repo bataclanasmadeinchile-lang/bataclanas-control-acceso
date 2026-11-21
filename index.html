@@ -172,7 +172,7 @@ async function iniciar() {
 
   if (camara) return;
 
-  if (pinInput.value.trim().length < 12) {
+  if (!/^\d{6}$/.test(pinInput.value.trim())) {
     mostrar(
       "🔒 Ingresa la contraseña del personal.",
       "rechazada"
